@@ -12,17 +12,26 @@
         <button id="ln-ai-close" class="ln-ai-close" title="Close">&times;</button>
     </header>
     <main class="ln-ai-body">
-        <div class="ln-ai-section-head">
-            <div class="ln-ai-section-label">Post data (JSON)</div>
-            <button id="ln-ai-copy-json" class="ln-ai-copy">Copy JSON</button>
-        </div>
-        <pre id="ln-ai-json" class="ln-ai-json">Select a post to get started.</pre>
+        <details class="ln-ai-accordion">
+            <summary class="ln-ai-summary">
+                <span class="ln-ai-section-label">Post data (JSON)</span>
+                <button id="ln-ai-copy-json" class="ln-ai-copy" type="button">Copy JSON</button>
+            </summary>
+            <pre id="ln-ai-json" class="ln-ai-json">Select a post to get started.</pre>
+        </details>
 
         <label class="ln-ai-section-label" for="ln-ai-experience">Your experience / intro</label>
         <textarea
             id="ln-ai-experience"
             class="ln-ai-experience"
             placeholder="Paste your background, role, expertise and how you want to come across. Saved automatically and woven into the prompt."
+        ></textarea>
+
+        <label class="ln-ai-section-label" for="ln-ai-take">Your take / draft comment (optional)</label>
+        <textarea
+            id="ln-ai-take"
+            class="ln-ai-experience"
+            placeholder="Jot down your rough thoughts or a draft comment. The LLM will refine it into the 5 styles."
         ></textarea>
 
         <div class="ln-ai-section-head">

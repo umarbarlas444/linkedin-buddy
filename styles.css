@@ -87,6 +87,43 @@ body.ln-ai-sidebar-body {
     color: #666;
 }
 
+/* Collapsible JSON accordion */
+.ln-ai-accordion {
+    margin-bottom: 16px;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 8px;
+}
+
+.ln-ai-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    list-style: none;
+    padding: 6px 0;
+}
+
+.ln-ai-summary::-webkit-details-marker {
+    display: none;
+}
+
+.ln-ai-summary .ln-ai-section-label::before {
+    content: "\25B8  "; /* ▸ */
+}
+
+.ln-ai-accordion[open] .ln-ai-summary .ln-ai-section-label::before {
+    content: "\25BE  "; /* ▾ */
+}
+
+.ln-ai-summary .ln-ai-copy {
+    margin-top: 0;
+    padding: 3px 10px;
+}
+
+.ln-ai-accordion .ln-ai-json {
+    margin: 8px 0 0;
+}
+
 .ln-ai-json {
     font-family: "SF Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
     font-size: 12px;

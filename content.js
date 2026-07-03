@@ -49,6 +49,8 @@ function createSidebar() {
     sidebarIframe = document.createElement("iframe");
     sidebarIframe.src = chrome.runtime.getURL("sidebar.html");
     sidebarIframe.id = "ln-ai-sidebar";
+    // Required so the clipboard API works inside this cross-origin iframe.
+    sidebarIframe.allow = "clipboard-write";
 
     Object.assign(sidebarIframe.style, {
         position: "fixed",
