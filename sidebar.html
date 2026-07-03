@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="styles.css" />
+    <title>AI Comment Companion</title>
+</head>
+<body class="ln-ai-sidebar-body">
+    <header class="ln-ai-header">
+        <h1>🤖 AI Comment Companion</h1>
+        <button id="ln-ai-close" class="ln-ai-close" title="Close">&times;</button>
+    </header>
+    <main class="ln-ai-body">
+        <div class="ln-ai-section-head">
+            <div class="ln-ai-section-label">Post data (JSON)</div>
+            <button id="ln-ai-copy-json" class="ln-ai-copy">Copy JSON</button>
+        </div>
+        <pre id="ln-ai-json" class="ln-ai-json">Select a post to get started.</pre>
+
+        <label class="ln-ai-section-label" for="ln-ai-experience">Your experience / intro</label>
+        <textarea
+            id="ln-ai-experience"
+            class="ln-ai-experience"
+            placeholder="Paste your background, role, expertise and how you want to come across. Saved automatically and woven into the prompt."
+        ></textarea>
+
+        <div class="ln-ai-section-head">
+            <div class="ln-ai-section-label">Prompt for the LLM</div>
+            <button id="ln-ai-copy-prompt" class="ln-ai-copy">Copy Prompt</button>
+        </div>
+        <pre id="ln-ai-prompt" class="ln-ai-json">Select a post to generate a prompt.</pre>
+
+        <button id="ln-ai-generate" class="ln-ai-generate">Suggest comments</button>
+
+        <div id="ln-ai-status" class="ln-ai-status"></div>
+        <div id="ln-ai-results"></div>
+    </main>
+    <script src="sidebar.js"></script>
+</body>
+</html>

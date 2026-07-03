@@ -1,0 +1,173 @@
+/* Injected AI Comment button inside LinkedIn posts */
+.ln-ai-comment-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #0a66c2;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 1;
+    transition: background-color 0.2s ease;
+}
+
+.ln-ai-comment-btn:hover {
+    background-color: rgba(10, 102, 194, 0.12);
+}
+
+.ln-ai-comment-btn .ln-ai-icon {
+    font-size: 16px;
+}
+
+/* Floating placement on the post container, clear of LinkedIn's menu/dismiss */
+.ln-ai-comment-btn--floating {
+    position: absolute;
+    top: 10px;
+    right: 80px;
+    z-index: 100;
+    background-color: #ffffff;
+    border: 1px solid #0a66c2;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* Sidebar document styles */
+body.ln-ai-sidebar-body {
+    margin: 0;
+    font-family: -apple-system, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #1d2226;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.ln-ai-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.ln-ai-header h1 {
+    font-size: 16px;
+    margin: 0;
+}
+
+.ln-ai-close {
+    border: none;
+    background: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: #666;
+    line-height: 1;
+}
+
+.ln-ai-body {
+    padding: 16px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.ln-ai-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.ln-ai-section-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #666;
+}
+
+.ln-ai-json {
+    font-family: "SF Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+    font-size: 12px;
+    line-height: 1.45;
+    background: #1d2226;
+    color: #e6edf3;
+    border-radius: 6px;
+    padding: 12px;
+    margin: 0 0 16px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.ln-ai-experience {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 90px;
+    resize: vertical;
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.4;
+    color: #1d2226;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    padding: 10px;
+    margin: 0 0 16px;
+}
+
+.ln-ai-experience:focus {
+    outline: none;
+    border-color: #0a66c2;
+    box-shadow: 0 0 0 1px #0a66c2;
+}
+
+.ln-ai-generate {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 20px;
+    background: #0a66c2;
+    color: #fff;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.ln-ai-generate:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.ln-ai-status {
+    font-size: 13px;
+    color: #666;
+    margin: 16px 0;
+}
+
+.ln-ai-suggestion {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 14px;
+    margin-top: 12px;
+    line-height: 1.4;
+}
+
+.ln-ai-section-head .ln-ai-copy {
+    margin-top: 0;
+    padding: 3px 10px;
+}
+
+.ln-ai-copy {
+    margin-top: 8px;
+    border: 1px solid #0a66c2;
+    background: #fff;
+    color: #0a66c2;
+    border-radius: 16px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}

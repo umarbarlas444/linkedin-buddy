@@ -1,0 +1,39 @@
+{
+    "manifest_version": 3,
+    "name": "LinkedIn AI Comment Companion",
+    "version": "1.0",
+    "description": "Generates tailored LinkedIn comments using AI via a floating sidebar.",
+    "permissions": [
+        "storage",
+        "activeTab"
+    ],
+    "host_permissions": [
+        "https://*.linkedin.com/*"
+    ],
+    "content_scripts": [
+        {
+            "matches": [
+                "https://*.linkedin.com/*"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "css": [
+                "styles.css"
+            ],
+            "run_at": "document_idle"
+        }
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "sidebar.html",
+                "styles.css",
+                "sidebar.js"
+            ],
+            "matches": [
+                "https://*.linkedin.com/*"
+            ]
+        }
+    ]
+}
