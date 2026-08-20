@@ -9,23 +9,33 @@
 const DEBUG = true;
 const log = (...args) => DEBUG && console.log("[LN-AI]", ...args);
 
-// LinkedIn's current feed uses fully obfuscated (hashed) CSS classes, so we
-// anchor on the attributes it keeps stable for accessibility/testing instead:
-//   - a feed post is a [role="listitem"] carrying a componentkey
-//   - its body text lives in [data-testid="expandable-text-box"]
-// The older class-based selectors are kept last as fallbacks for any account
-// still served the previous UI.
-const POST_SELECTORS = [
-    '[role="listitem"][componentkey]',
-    'div.feed-shared-update-v2',
-    '[data-urn^="urn:li:activity"]',
+// LinkedIn's feed uses fully obfuscated (hashed) CSS classes, and which
+// attributes land on the post element varies between accounts/experiments — some
+// feeds carry `componentkey` on the post, others don't. The one marker present on
+// every real post across variants is its control-menu button, whose aria-label
+// reads "Open control menu for post by <name>". We anchor on that and climb to
+// the post container, rather than matching the post element directly.
+const POST_MENU_SELECTOR = '[aria-label^="Open control menu for post by"]';
+
+// Candidate outermost-post containers, tried in priority order so we normalize to
+// the whole post (the list item) instead of a nested wrapper. `[role="listitem"]`
+// is the post row in current feeds; the rest cover older/other variants.
+const POST_CONTAINER_SELECTORS = [
+    '[role="listitem"]',
+    "div.feed-shared-update-v2",
     '[data-id^="urn:li:activity"]',
-    'div.fie-impression-container',
+    '[data-urn^="urn:li:activity"]',
+    "[componentkey]",
 ];
 
-// Selector for the outermost single-post container, used to de-dupe nested
-// matches so one post gets exactly one button.
-const POST_CONTAINER_SELECTOR = '[role="listitem"][componentkey], div.feed-shared-update-v2';
+// Climb from any element to its post container, preferring the widest match.
+function resolvePostContainer(el) {
+    for (const sel of POST_CONTAINER_SELECTORS) {
+        const found = el.closest(sel);
+        if (found) return found;
+    }
+    return null;
+}
 
 // LinkedIn encodes reaction types in the SVG ids of the "reactions" ring row.
 const REACTION_NAMES = {
@@ -384,7 +394,7 @@ function getCommentText(scope) {
 }
 
 function extractCommentData(scope) {
-    const parentEl = scope.closest(POST_CONTAINER_SELECTOR);
+    const parentEl = resolvePostContainer(scope);
     // Reuse the full post extractor for context; guard against it throwing on
     // unusual layouts so a reply can still be generated from the comment alone.
     let parentPost = null;
@@ -467,7 +477,7 @@ function buildButton(post) {
 
 function injectAIButton(candidate) {
     // Normalize to the outermost post container so nested matches don't double up.
-    const post = candidate.closest(POST_CONTAINER_SELECTOR) || candidate;
+    const post = resolvePostContainer(candidate) || candidate;
 
     if (post.dataset.lnAiInjected === "1") return;
     // Skip if an ancestor post already got a button (avoids nested duplicates).
@@ -485,11 +495,16 @@ function injectAIButton(candidate) {
 
 function scanAndInject(root = document) {
     let count = 0;
-    for (const sel of POST_SELECTORS) {
-        root.querySelectorAll(sel).forEach((el) => {
-            injectAIButton(el);
+    if (root.querySelectorAll) {
+        root.querySelectorAll(POST_MENU_SELECTOR).forEach((menu) => {
+            injectAIButton(menu);
             count++;
         });
+    }
+    // The added node itself may be a control-menu button (observer edge case).
+    if (root.matches && root.matches(POST_MENU_SELECTOR)) {
+        injectAIButton(root);
+        count++;
     }
     return count;
 }
@@ -508,9 +523,6 @@ function boot() {
         for (const mutation of mutations) {
             for (const node of mutation.addedNodes) {
                 if (node.nodeType !== Node.ELEMENT_NODE) continue;
-                for (const sel of POST_SELECTORS) {
-                    if (node.matches && node.matches(sel)) injectAIButton(node);
-                }
                 scanAndInject(node);
                 scanAndInjectComments(node);
             }
