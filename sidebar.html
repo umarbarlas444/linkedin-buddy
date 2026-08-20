@@ -9,42 +9,101 @@
 <body class="ln-ai-sidebar-body">
     <header class="ln-ai-header">
         <h1>🤖 AI Comment Companion</h1>
-        <button id="ln-ai-close" class="ln-ai-close" title="Close">&times;</button>
-    </header>
-    <main class="ln-ai-body">
-        <details class="ln-ai-accordion">
-            <summary class="ln-ai-summary">
-                <span class="ln-ai-section-label">Post data (JSON)</span>
-                <button id="ln-ai-copy-json" class="ln-ai-copy" type="button">Copy JSON</button>
-            </summary>
-            <pre id="ln-ai-json" class="ln-ai-json">Select a post to get started.</pre>
-        </details>
-
-        <label class="ln-ai-section-label" for="ln-ai-experience">Your experience / intro</label>
-        <textarea
-            id="ln-ai-experience"
-            class="ln-ai-experience"
-            placeholder="Paste your background, role, expertise and how you want to come across. Saved automatically and woven into the prompt."
-        ></textarea>
-
-        <label class="ln-ai-section-label" for="ln-ai-take">Your take / draft comment (optional)</label>
-        <textarea
-            id="ln-ai-take"
-            class="ln-ai-experience"
-            placeholder="Jot down your rough thoughts or a draft comment. The LLM will refine it into the 5 styles."
-        ></textarea>
-
-        <div class="ln-ai-section-head">
-            <div class="ln-ai-section-label">Prompt for the LLM</div>
-            <button id="ln-ai-copy-prompt" class="ln-ai-copy">Copy Prompt</button>
+        <div class="ln-ai-header-actions">
+            <button id="ln-ai-settings-toggle" class="ln-ai-icon-btn" type="button" title="Settings">⚙️</button>
+            <button id="ln-ai-close" class="ln-ai-close" type="button" title="Close">&times;</button>
         </div>
-        <pre id="ln-ai-prompt" class="ln-ai-json">Select a post to generate a prompt.</pre>
+    </header>
 
-        <button id="ln-ai-generate" class="ln-ai-generate">Suggest comments</button>
+    <main class="ln-ai-body">
+        <!-- ===== Settings view ===== -->
+        <section id="ln-ai-settings" class="ln-ai-settings" hidden>
+            <div class="ln-ai-section-head">
+                <div class="ln-ai-section-label">Settings</div>
+                <button id="ln-ai-settings-back" class="ln-ai-copy" type="button">Done</button>
+            </div>
 
-        <div id="ln-ai-status" class="ln-ai-status"></div>
-        <div id="ln-ai-results"></div>
+            <label class="ln-ai-section-label" for="ln-ai-theme">Theme</label>
+            <select id="ln-ai-theme" class="ln-ai-select">
+                <option value="system">System</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+            </select>
+
+            <label class="ln-ai-section-label" for="ln-ai-model">Model</label>
+            <select id="ln-ai-model" class="ln-ai-select">
+                <option value="gemini-3.7-flash">Gemini 3.7 Flash (recommended)</option>
+                <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+                <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite (fastest)</option>
+            </select>
+
+            <label class="ln-ai-section-label" for="ln-ai-key">Gemini API key</label>
+            <div class="ln-ai-key-row">
+                <input
+                    id="ln-ai-key"
+                    class="ln-ai-input"
+                    type="password"
+                    placeholder="Paste your Gemini API key"
+                    autocomplete="off"
+                    spellcheck="false"
+                />
+                <button id="ln-ai-key-toggle" class="ln-ai-copy" type="button">Show</button>
+            </div>
+            <p class="ln-ai-hint">
+                Stored only on this device, never sent anywhere but Google.
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Get a free key →</a>
+            </p>
+
+            <label class="ln-ai-section-label" for="ln-ai-experience">Personal information</label>
+            <textarea
+                id="ln-ai-experience"
+                class="ln-ai-experience"
+                placeholder="Your background, role, expertise and how you want to come across. Woven into the prompt so comments sound like you."
+            ></textarea>
+
+            <div class="ln-ai-styles-head">
+                <span class="ln-ai-section-label">Comment styles</span>
+                <button id="ln-ai-reset-styles" class="ln-ai-linkbtn" type="button">Reset to defaults</button>
+            </div>
+            <p class="ln-ai-hint">Toggle a style off to leave it out of the prompt. Edit or add your own.</p>
+            <div id="ln-ai-styles" class="ln-ai-styles"></div>
+            <button id="ln-ai-add-style" class="ln-ai-copy" type="button">+ Add style</button>
+
+            <div id="ln-ai-settings-status" class="ln-ai-status"></div>
+        </section>
+
+        <!-- ===== Main view ===== -->
+        <section id="ln-ai-main">
+            <div id="ln-ai-mode" class="ln-ai-mode" hidden></div>
+
+            <details class="ln-ai-accordion">
+                <summary class="ln-ai-summary">
+                    <span class="ln-ai-section-label">Post data (JSON)</span>
+                    <button id="ln-ai-copy-json" class="ln-ai-copy" type="button">Copy JSON</button>
+                </summary>
+                <pre id="ln-ai-json" class="ln-ai-json">Select a post to get started.</pre>
+            </details>
+
+            <label class="ln-ai-section-label" for="ln-ai-take">Your take / draft comment (optional)</label>
+            <textarea
+                id="ln-ai-take"
+                class="ln-ai-experience"
+                placeholder="Jot down your rough thoughts or a draft comment. The AI will refine it into your enabled styles."
+            ></textarea>
+
+            <div class="ln-ai-section-head">
+                <div class="ln-ai-section-label">Prompt for the LLM</div>
+                <button id="ln-ai-copy-prompt" class="ln-ai-copy">Copy Prompt</button>
+            </div>
+            <pre id="ln-ai-prompt" class="ln-ai-json">Select a post to generate a prompt.</pre>
+
+            <button id="ln-ai-generate" class="ln-ai-generate">Suggest comments</button>
+
+            <div id="ln-ai-status" class="ln-ai-status"></div>
+            <div id="ln-ai-results"></div>
+        </section>
     </main>
+
     <script src="sidebar.js"></script>
 </body>
 </html>

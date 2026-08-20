@@ -1,4 +1,34 @@
-/* Injected AI Comment button inside LinkedIn posts */
+/* ===== Theme tokens ===== */
+:root {
+    --bg: #ffffff;
+    --fg: #1d2226;
+    --muted: #666666;
+    --border: #e0e0e0;
+    --accent: #0a66c2;
+    --accent-contrast: #ffffff;
+    --input-bg: #ffffff;
+    --input-border: #d0d0d0;
+    --card-bg: #ffffff;
+    --code-bg: #1d2226;
+    --code-fg: #e6edf3;
+}
+
+[data-theme="dark"] {
+    --bg: #1b1f23;
+    --fg: #e6edf3;
+    --muted: #9aa4ad;
+    --border: #333a40;
+    --accent: #4a9eff;
+    --accent-contrast: #0b1015;
+    --input-bg: #22272b;
+    --input-border: #3a4149;
+    --card-bg: #22272b;
+    --code-bg: #0d1117;
+    --code-fg: #e6edf3;
+}
+
+/* Injected AI Comment button inside LinkedIn posts (lives in LinkedIn's own
+   page context, so it is intentionally NOT themed by the sidebar tokens). */
 .ln-ai-comment-btn {
     display: inline-flex;
     align-items: center;
@@ -23,6 +53,20 @@
     font-size: 16px;
 }
 
+/* Inline "AI Reply" button placed under an individual comment */
+.ln-ai-reply-btn {
+    padding: 2px 8px;
+    font-size: 12px;
+    margin: 4px 0 2px;
+    border: 1px solid rgba(10, 102, 194, 0.4);
+    border-radius: 12px;
+    line-height: 1.4;
+}
+
+.ln-ai-reply-btn .ln-ai-icon {
+    font-size: 13px;
+}
+
 /* Floating placement on the post container, clear of LinkedIn's menu/dismiss */
 .ln-ai-comment-btn--floating {
     position: absolute;
@@ -34,12 +78,12 @@
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
 }
 
-/* Sidebar document styles */
+/* ===== Sidebar document ===== */
 body.ln-ai-sidebar-body {
     margin: 0;
     font-family: -apple-system, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: #1d2226;
-    background: #ffffff;
+    color: var(--fg);
+    background: var(--bg);
     display: flex;
     flex-direction: column;
     height: 100vh;
@@ -50,7 +94,7 @@ body.ln-ai-sidebar-body {
     align-items: center;
     justify-content: space-between;
     padding: 16px;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--border);
 }
 
 .ln-ai-header h1 {
@@ -58,12 +102,32 @@ body.ln-ai-sidebar-body {
     margin: 0;
 }
 
+.ln-ai-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.ln-ai-icon-btn {
+    border: none;
+    background: none;
+    font-size: 16px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 4px 6px;
+    border-radius: 6px;
+}
+
+.ln-ai-icon-btn:hover {
+    background: var(--border);
+}
+
 .ln-ai-close {
     border: none;
     background: none;
     font-size: 20px;
     cursor: pointer;
-    color: #666;
+    color: var(--muted);
     line-height: 1;
 }
 
@@ -84,13 +148,183 @@ body.ln-ai-sidebar-body {
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: #666;
+    color: var(--muted);
+}
+
+/* ===== Settings ===== */
+.ln-ai-settings label.ln-ai-section-label {
+    display: block;
+    margin: 14px 0 6px;
+}
+
+.ln-ai-select,
+.ln-ai-input {
+    width: 100%;
+    box-sizing: border-box;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--fg);
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+    padding: 9px 10px;
+}
+
+.ln-ai-select:focus,
+.ln-ai-input:focus,
+.ln-ai-experience:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+}
+
+.ln-ai-key-row {
+    display: flex;
+    gap: 6px;
+    align-items: stretch;
+}
+
+.ln-ai-key-row .ln-ai-input {
+    flex: 1;
+}
+
+.ln-ai-key-row .ln-ai-copy {
+    margin-top: 0;
+    white-space: nowrap;
+}
+
+.ln-ai-hint {
+    font-size: 12px;
+    color: var(--muted);
+    margin: 8px 0 0;
+    line-height: 1.4;
+}
+
+.ln-ai-hint a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+/* ===== Comment styles editor ===== */
+.ln-ai-styles-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 18px 0 4px;
+}
+
+.ln-ai-linkbtn {
+    border: none;
+    background: none;
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+}
+
+.ln-ai-styles {
+    margin: 10px 0 0;
+}
+
+.ln-ai-style {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 10px;
+    background: var(--card-bg);
+}
+
+.ln-ai-style--off {
+    opacity: 0.55;
+}
+
+.ln-ai-style-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.ln-ai-style-toggle {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    cursor: pointer;
+    accent-color: var(--accent);
+}
+
+.ln-ai-style-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fg);
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+    padding: 6px 8px;
+}
+
+.ln-ai-style-del {
+    flex: 0 0 auto;
+    border: none;
+    background: none;
+    color: var(--muted);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+}
+
+.ln-ai-style-del:hover {
+    color: #d93025;
+}
+
+.ln-ai-style-instruction {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 60px;
+    resize: vertical;
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--fg);
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+    padding: 8px;
+}
+
+.ln-ai-style-name:focus,
+.ln-ai-style-instruction:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+}
+
+#ln-ai-add-style {
+    margin-top: 2px;
+}
+
+/* Reply-mode banner in the main view */
+.ln-ai-mode {
+    background: rgba(10, 102, 194, 0.1);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 14px;
+    word-break: break-word;
 }
 
 /* Collapsible JSON accordion */
 .ln-ai-accordion {
     margin-bottom: 16px;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--border);
     padding-bottom: 8px;
 }
 
@@ -128,8 +362,8 @@ body.ln-ai-sidebar-body {
     font-family: "SF Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
     font-size: 12px;
     line-height: 1.45;
-    background: #1d2226;
-    color: #e6edf3;
+    background: var(--code-bg);
+    color: var(--code-fg);
     border-radius: 6px;
     padding: 12px;
     margin: 0 0 16px;
@@ -147,17 +381,12 @@ body.ln-ai-sidebar-body {
     font-family: inherit;
     font-size: 13px;
     line-height: 1.4;
-    color: #1d2226;
-    border: 1px solid #d0d0d0;
+    color: var(--fg);
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
     border-radius: 6px;
     padding: 10px;
     margin: 0 0 16px;
-}
-
-.ln-ai-experience:focus {
-    outline: none;
-    border-color: #0a66c2;
-    box-shadow: 0 0 0 1px #0a66c2;
 }
 
 .ln-ai-generate {
@@ -165,8 +394,8 @@ body.ln-ai-sidebar-body {
     padding: 10px;
     border: none;
     border-radius: 20px;
-    background: #0a66c2;
-    color: #fff;
+    background: var(--accent);
+    color: var(--accent-contrast);
     font-weight: 600;
     font-size: 14px;
     cursor: pointer;
@@ -179,17 +408,36 @@ body.ln-ai-sidebar-body {
 
 .ln-ai-status {
     font-size: 13px;
-    color: #666;
+    color: var(--muted);
     margin: 16px 0;
 }
 
+.ln-ai-status.ln-ai-status--error {
+    color: #d93025;
+}
+
 .ln-ai-suggestion {
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 12px;
     font-size: 14px;
     margin-top: 12px;
     line-height: 1.4;
+    background: var(--card-bg);
+}
+
+.ln-ai-suggestion-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.ln-ai-suggestion-text {
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
 .ln-ai-section-head .ln-ai-copy {
@@ -199,9 +447,9 @@ body.ln-ai-sidebar-body {
 
 .ln-ai-copy {
     margin-top: 8px;
-    border: 1px solid #0a66c2;
-    background: #fff;
-    color: #0a66c2;
+    border: 1px solid var(--accent);
+    background: var(--card-bg);
+    color: var(--accent);
     border-radius: 16px;
     padding: 4px 12px;
     font-size: 12px;

@@ -43,6 +43,16 @@ let sidebarIframe = null;
 
 // --- Sidebar ---------------------------------------------------------------
 
+// Keep the iframe shell background in sync with the sidebar's theme so there's
+// no white flash behind the panel while it slides in (or in dark mode).
+function shellBg(theme) {
+    return theme === "dark" ? "#1b1f23" : "#ffffff";
+}
+
+function applyIframeTheme(theme) {
+    if (sidebarIframe) sidebarIframe.style.backgroundColor = shellBg(theme);
+}
+
 function createSidebar() {
     if (sidebarIframe) return;
 
@@ -65,18 +75,41 @@ function createSidebar() {
         backgroundColor: "#ffffff",
     });
 
+    // Paint the shell with the last-known theme before the sidebar reports in.
+    try {
+        chrome.storage.sync.get("ln_ai_settings", (res) => {
+            const s = res && res.ln_ai_settings;
+            if (!s || !s.theme || s.theme === "system") {
+                const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+                applyIframeTheme(dark ? "dark" : "light");
+            } else {
+                applyIframeTheme(s.theme);
+            }
+        });
+    } catch {
+        // storage unavailable; keep the default white shell
+    }
+
     document.body.appendChild(sidebarIframe);
     log("sidebar iframe created");
 }
 
-function toggleSidebar(open = true, postData = null) {
+// payload: { mode: "comment"|"reply", post, comment }. The sidebar can be slow
+// to boot, so we resend a few times until its listener is ready.
+function toggleSidebar(open = true, payload = null) {
     if (!sidebarIframe) createSidebar();
 
     if (open) {
         sidebarIframe.style.right = "0";
+        const message = {
+            type: "LN_AI_POST_DATA",
+            mode: (payload && payload.mode) || "comment",
+            post: (payload && payload.post) || null,
+            comment: (payload && payload.comment) || null,
+        };
         const send = () =>
             sidebarIframe.contentWindow &&
-            sidebarIframe.contentWindow.postMessage({ type: "LN_AI_POST_DATA", post: postData }, "*");
+            sidebarIframe.contentWindow.postMessage(message, "*");
         send();
         setTimeout(send, 150);
         setTimeout(send, 400);
@@ -124,6 +157,48 @@ function getAuthorName(post) {
     return null;
 }
 
+// The author's headline/job title. LinkedIn's author link holds only the name
+// and connection degree; the headline is the first real text line AFTER that
+// author block and BEFORE the timestamp. Everything that trips the old code —
+// "Suggested", "Following", "Promoted by LinkedIn", "X commented on this" — sits
+// either before the author block or is a CTA/time line, so we anchor on the
+// author link's position and skip those explicitly.
+function getHeadline(post, textBox, authorLink) {
+    if (!authorLink) return null;
+
+    // Short, own-text header lines above the post body, in DOM order.
+    const leaves = [...post.querySelectorAll("p, span")].filter((el) => {
+        if (textBox && textBox.contains(el)) return false;
+        const hasOwnText = [...el.childNodes].some(
+            (n) => n.nodeType === Node.TEXT_NODE && n.textContent.trim()
+        );
+        const t = el.innerText.trim();
+        return hasOwnText && t && t.length < 200;
+    });
+
+    // The author block (name + degree) lives inside the author link; the headline
+    // is the first qualifying line after it.
+    let lastAuthorIdx = -1;
+    leaves.forEach((el, i) => {
+        if (authorLink.contains(el)) lastAuthorIdx = i;
+    });
+    if (lastAuthorIdx === -1) return null;
+
+    // CTA / feed-reason noise to skip over.
+    const SKIP = /^(\+?\s*follow(ing)?|connect|message|subscribe|promoted( by linkedin)?|visit\b.*|edited)$/i;
+    // Timestamp or engagement/action row — headline never appears past here.
+    const STOP =
+        /^\s*\d+\s*(s|m|h|d|w|mo|yr|min|hour|day|week|month|year)s?\b|\b(reaction|comment|repost|follower)s?\b|^(feed post|like|comment|repost|send|play video|video player)/i;
+
+    for (let i = lastAuthorIdx + 1; i < leaves.length; i++) {
+        const t = leaves[i].innerText.trim();
+        if (STOP.test(t)) break;
+        if (SKIP.test(t) || /^[•·\s]+$/.test(t)) continue;
+        return t;
+    }
+    return null;
+}
+
 // Pull as much structured data as the DOM reliably exposes for one post.
 function extractPostData(post) {
     const textBox = post.querySelector('[data-testid="expandable-text-box"]');
@@ -136,53 +211,49 @@ function extractPostData(post) {
     // Author profile URL + avatar: prefer the link/image matching the name so
     // we don't grab the reactor from a "X likes this" social-context row.
     const inLinks = [...post.querySelectorAll('a[href*="/in/"]')];
-    let profileUrl = null;
+    // The author's own profile link — prefer the one that mentions the author's
+    // name so we don't grab a reactor from a "X likes this" social-context row.
+    const authorLink =
+        (name &&
+            inLinks.find(
+                (a) =>
+                    (a.getAttribute("aria-label") || "").includes(name) ||
+                    (a.innerText || "").includes(name)
+            )) ||
+        inLinks[0] ||
+        null;
+
+    const profileUrl = authorLink ? cleanUrl(authorLink.href) : null;
     let avatarUrl = null;
     if (name) {
-        const byName = inLinks.find(
-            (a) =>
-                (a.getAttribute("aria-label") || "").includes(name) ||
-                (a.innerText || "").includes(name)
-        );
-        if (byName) profileUrl = cleanUrl(byName.href);
         const avatar = [...post.querySelectorAll("img")].find(
             (img) => img.alt && img.alt.includes(name) && /profile/i.test(img.alt)
         );
         if (avatar) avatarUrl = avatar.src;
     }
-    if (!profileUrl && inLinks[0]) profileUrl = cleanUrl(inLinks[0].href);
 
     // Social context, e.g. "Angie Aguilar likes this".
     const socialContext =
-        [...post.querySelectorAll("p")]
-            .map((p) => p.innerText.trim())
+        [...post.querySelectorAll("p, span")]
+            .map((el) => el.innerText.trim())
             .find((t) =>
                 /\b(likes|loves|celebrates|commented on|reposted|reacted to|shared)\b.*\bthis\b/i.test(t)
             ) || null;
 
-    // Header paragraphs (everything outside the body text) hold degree/headline/time.
-    const headerPs = [...post.querySelectorAll("p")]
-        .filter((p) => !textBox || !textBox.contains(p))
-        .map((p) => p.innerText.trim())
+    // Header lines (everything outside the body text) hold degree/time.
+    const headerLines = [...post.querySelectorAll("p, span")]
+        .filter((el) => !textBox || !textBox.contains(el))
+        .map((el) => el.innerText.trim())
         .filter(Boolean);
 
-    const degree = firstMatch(headerPs.join(" | "), /\b(1st|2nd|3rd)\b/);
+    const degree = firstMatch(headerLines.join(" | "), /\b(1st|2nd|3rd)\b/);
 
-    const timeStr = headerPs.find((s) =>
-        /^\s*\d+\s*(s|m|h|d|w|mo|yr)\b/i.test(s)
-    );
+    const timeStr = headerLines.find((s) => /^\s*\d+\s*(s|m|h|d|w|mo|yr)\b/i.test(s));
     const postedTime = firstMatch(timeStr, /\d+\s*(s|m|h|d|w|mo|yr|min|hour|day|week|month|year)s?/i);
 
-    const headline =
-        headerPs.find(
-            (t) =>
-                t !== name &&
-                t !== socialContext &&
-                !/\b(1st|2nd|3rd)\b/.test(t) &&
-                !/^\s*\d+\s*(s|m|h|d|w|mo|yr)/i.test(t) &&
-                !/\b(likes|commented on|reposted|reacted)\b/i.test(t) &&
-                !/^[•\s]+$/.test(t)
-        ) || null;
+    // Positional headline extraction (anchored to the author link) — replaces the
+    // old keyword-guessing that leaked "Suggested" / "Following" / context rows.
+    const headline = getHeadline(post, textBox, authorLink);
 
     const visSvg = post.querySelector('svg[aria-label^="Visibility"]');
     const visibility = visSvg
@@ -263,6 +334,121 @@ function extractPostData(post) {
     };
 }
 
+// --- Comments (for replies) ------------------------------------------------
+//
+// LinkedIn's comment DOM is fully hashed (no stable class or data-id on the
+// comment container), so we can't select comments directly. Three hooks survive
+// and we anchor on them instead:
+//   1. Every posted comment has a `button[aria-label="Reply"]`; the post does
+//      not. That button is our per-comment marker and our button's placement.
+//   2. Comment text lives in `[data-testid="expandable-text-box"]` (same testid
+//      the post body uses — we scope it to the comment to disambiguate).
+//   3. The avatar's alt / aria-label reads "View <Name>'s profile".
+
+// The comment's "View <Name>'s profile" avatar → the commenter's name.
+const PROFILE_ALT_RE = /View\s+(.+?)['’`]s\s+profile/i;
+
+// Reply buttons; the exact-match form covers English, the prefix covers
+// localized "Reply to <name>" variants some UIs render.
+const REPLY_BTN_SELECTOR = 'button[aria-label="Reply"], button[aria-label^="Reply to"]';
+
+// Walk up from a Reply button to the tightest comment block: the first ancestor
+// that holds both this comment's text box and its "View…profile" avatar. That
+// pairing lands on the individual comment, not the whole post or a nested reply.
+function commentScopeFrom(replyBtn) {
+    let el = replyBtn.parentElement;
+    for (let i = 0; el && i < 15; i++, el = el.parentElement) {
+        const hasText = el.querySelector('[data-testid="expandable-text-box"]');
+        const hasAvatar = el.querySelector('img[alt^="View "], svg[aria-label^="View "]');
+        if (hasText && hasAvatar) return el;
+    }
+    return null;
+}
+
+function getCommentAuthor(scope) {
+    const el = scope.querySelector('img[alt^="View "], svg[aria-label^="View "]');
+    const label = el ? el.getAttribute("alt") || el.getAttribute("aria-label") : "";
+    const m = (label || "").match(PROFILE_ALT_RE);
+    if (m) return m[1].trim();
+    // Fallback: a profile link's visible text.
+    const link = scope.querySelector('a[href*="/in/"]');
+    const t = link ? (link.innerText || "").trim().split("\n")[0].trim() : "";
+    return t || null;
+}
+
+function getCommentText(scope) {
+    const box = scope.querySelector('[data-testid="expandable-text-box"]');
+    let text = box ? box.innerText.trim() : "";
+    text = text.replace(/\s*…\s*more\s*$/i, "").trim();
+    return text;
+}
+
+function extractCommentData(scope) {
+    const parentEl = scope.closest(POST_CONTAINER_SELECTOR);
+    // Reuse the full post extractor for context; guard against it throwing on
+    // unusual layouts so a reply can still be generated from the comment alone.
+    let parentPost = null;
+    if (parentEl) {
+        try {
+            parentPost = extractPostData(parentEl);
+        } catch {
+            parentPost = null;
+        }
+    }
+    return {
+        comment: {
+            author: { name: getCommentAuthor(scope) },
+            text: getCommentText(scope),
+            url: location.href,
+            extractedAt: new Date().toISOString(),
+        },
+        post: parentPost,
+    };
+}
+
+function buildReplyButton(scope) {
+    const btn = document.createElement("button");
+    btn.className = "ln-ai-comment-btn ln-ai-reply-btn";
+    btn.type = "button";
+    btn.title = "Get AI reply suggestions";
+    btn.innerHTML = `<span class="ln-ai-icon" aria-hidden="true">🤖</span><span class="ln-ai-text">AI Reply</span>`;
+
+    btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const { comment, post } = extractCommentData(scope);
+        toggleSidebar(true, { mode: "reply", post, comment });
+    });
+
+    return btn;
+}
+
+// Attach an "AI Reply" button next to one native Reply button.
+function injectReplyButton(replyBtn) {
+    if (replyBtn.dataset.lnAiReplyDone === "1") return;
+
+    const scope = commentScopeFrom(replyBtn);
+    // No resolvable comment (e.g. the reply-editor's submit button) → skip, but
+    // mark it so we don't re-scan the same button every mutation.
+    if (!scope || scope.querySelector('[contenteditable="true"]')) {
+        replyBtn.dataset.lnAiReplyDone = "1";
+        return;
+    }
+
+    replyBtn.dataset.lnAiReplyDone = "1";
+    const btn = buildReplyButton(scope);
+    if (replyBtn.parentElement) {
+        replyBtn.parentElement.insertBefore(btn, replyBtn.nextSibling);
+    }
+}
+
+function scanAndInjectComments(root = document) {
+    if (root.querySelectorAll) root.querySelectorAll(REPLY_BTN_SELECTOR).forEach(injectReplyButton);
+    if (root.matches && root.matches(REPLY_BTN_SELECTOR)) injectReplyButton(root);
+}
+
+// --- Post button injection -------------------------------------------------
+
 function buildButton(post) {
     const btn = document.createElement("button");
     btn.className = "ln-ai-comment-btn ln-ai-comment-btn--floating";
@@ -273,7 +459,7 @@ function buildButton(post) {
     btn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
-        toggleSidebar(true, extractPostData(post));
+        toggleSidebar(true, { mode: "comment", post: extractPostData(post) });
     });
 
     return btn;
@@ -315,6 +501,7 @@ function boot() {
     createSidebar();
 
     const found = scanAndInject();
+    scanAndInjectComments();
     log("initial scan matched", found, "candidate(s)");
 
     const observer = new MutationObserver((mutations) => {
@@ -324,7 +511,8 @@ function boot() {
                 for (const sel of POST_SELECTORS) {
                     if (node.matches && node.matches(sel)) injectAIButton(node);
                 }
-                if (node.querySelectorAll) scanAndInject(node);
+                scanAndInject(node);
+                scanAndInjectComments(node);
             }
         }
     });
@@ -334,13 +522,17 @@ function boot() {
     let ticks = 0;
     const interval = setInterval(() => {
         scanAndInject();
+        scanAndInjectComments();
         if (++ticks >= 10) clearInterval(interval);
     }, 1500);
 }
 
 window.addEventListener("message", (event) => {
-    if (event.data && event.data.type === "LN_AI_CLOSE_SIDEBAR") {
+    if (!event.data) return;
+    if (event.data.type === "LN_AI_CLOSE_SIDEBAR") {
         toggleSidebar(false);
+    } else if (event.data.type === "LN_AI_THEME") {
+        applyIframeTheme(event.data.theme);
     }
 });
 

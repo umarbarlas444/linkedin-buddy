@@ -8,7 +8,8 @@
         "activeTab"
     ],
     "host_permissions": [
-        "https://*.linkedin.com/*"
+        "https://*.linkedin.com/*",
+        "https://generativelanguage.googleapis.com/*"
     ],
     "content_scripts": [
         {
