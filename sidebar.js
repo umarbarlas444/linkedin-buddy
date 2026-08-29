@@ -237,7 +237,25 @@ function buildPrompt(post, experience, take, imageCount = 0) {
         if (post.socialContext) L.push(`Social context: ${post.socialContext}`);
         if (post.postedTime) L.push(`Posted: ${post.postedTime} ago`);
         if (post.mediaType && post.mediaType !== "none") {
-            L.push(`Media: ${post.mediaType}${post.imageCount ? ` (${post.imageCount})` : ""}`);
+            // This line is scraped metadata, independent of what we actually
+            // attach. Announcing "Media: image (1)" while sending no image tells
+            // the model something exists that it cannot see, and it will happily
+            // invent the contents — so spell out whatever is being withheld.
+            const total = (post.images || []).length;
+            let withheld = "";
+            if (post.mediaType === "video") {
+                withheld = " — the video is NOT attached; do not describe or guess at what it shows.";
+            } else if (total && imageCount === 0) {
+                withheld =
+                    total === 1
+                        ? " — NOT attached; do not describe or guess at what it shows."
+                        : " — NOT attached; do not describe or guess at what they show.";
+            } else if (total && imageCount < total) {
+                withheld = ` — only the first ${imageCount} of these are attached below.`;
+            }
+            L.push(
+                `Media: ${post.mediaType}${post.imageCount ? ` (${post.imageCount})` : ""}` + withheld
+            );
         }
         const engagement = [
             c.reactions != null ? `${c.reactions} reactions` : null,
