@@ -9,6 +9,7 @@ const SETTINGS_DEFAULTS = {
     model: "gemini-3.7-flash",
     theme: "system",
     experience: "",
+    sendImages: true, // attach the post's images to the request
     styles: [], // real defaults come from defaultStyles() on first run
 };
 
@@ -84,6 +85,13 @@ const RETIRED_MODELS = new Set([
     "gemini-1.5-pro",
 ]);
 
+// Image limits. Only the first MAX_IMAGES of a post are sent; the API's ceiling
+// is 20MB for the whole request, so these stay far under it. Declared up here
+// because the prompt preview and the thumbnail strip both read MAX_IMAGES.
+const MAX_IMAGES = 4;
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const OK_IMAGE_TYPES = /^image\/(png|jpeg|webp|heic|heif)$/;
+
 let settings = { ...SETTINGS_DEFAULTS };
 let currentMode = "comment"; // "comment" (on a post) | "reply" (to a comment)
 let currentPost = null; // the post, or the reply's parent post used as context
@@ -110,6 +118,10 @@ const els = {
     mode: document.getElementById("ln-ai-mode"),
     json: document.getElementById("ln-ai-json"),
     copyJson: document.getElementById("ln-ai-copy-json"),
+    imagesSection: document.getElementById("ln-ai-images-section"),
+    imagesLabel: document.getElementById("ln-ai-images-label"),
+    images: document.getElementById("ln-ai-images"),
+    sendImages: document.getElementById("ln-ai-send-images"),
     take: document.getElementById("ln-ai-take"),
     prompt: document.getElementById("ln-ai-prompt"),
     copyPrompt: document.getElementById("ln-ai-copy-prompt"),
@@ -331,20 +343,77 @@ function buildPrompt(post, experience, take, imageCount = 0) {
     return L.join("\n");
 }
 
-// The image URLs we'll try to attach for the current target. In reply mode
-// `currentPost` is the parent post, so replies inherit the post's images.
+// Every image on the current target. In reply mode `currentPost` is the parent
+// post, so replies inherit the post's images.
 function currentImageUrls() {
     return (currentPost && currentPost.images) || [];
 }
 
+// The subset actually destined for the model — empty when the user has
+// unticked "Send to AI".
+function imageUrlsToSend() {
+    return settings.sendImages ? currentImageUrls() : [];
+}
+
 function renderPrompt() {
+    // Preview what will actually be sent: MAX_IMAGES is the ceiling per request,
+    // and unticking the checkbox drops the image block from the prompt entirely.
     els.prompt.textContent = buildPrompt(
         currentPost,
         settings.experience,
         els.take.value,
-        currentImageUrls().length
+        Math.min(imageUrlsToSend().length, MAX_IMAGES)
     );
 }
+
+// --- Image strip -----------------------------------------------------------
+
+// Show the post's images in the panel so it's visible what the model is being
+// given, with a per-request opt-out. Thumbnails load straight from the CDN.
+function renderImages() {
+    const urls = currentImageUrls();
+    els.imagesSection.hidden = urls.length === 0;
+    els.images.innerHTML = "";
+    if (!urls.length) return;
+
+    const capped = urls.length > MAX_IMAGES;
+    els.imagesLabel.textContent =
+        urls.length === 1 ? "Post image" : `Post images (${urls.length})`;
+
+    urls.forEach((url, i) => {
+        const img = document.createElement("img");
+        img.className = "ln-ai-thumb";
+        img.src = url;
+        img.loading = "lazy";
+        img.alt = `Post image ${i + 1}`;
+        // Only the first MAX_IMAGES are sent; say so on the ones that aren't.
+        img.title = capped && i >= MAX_IMAGES ? `${url}\n(not sent — over the ${MAX_IMAGES}-image limit)` : url;
+        if (capped && i >= MAX_IMAGES) img.style.opacity = "0.35";
+        // A dead URL would otherwise show as a silent broken-image glyph.
+        img.addEventListener("error", () => {
+            const ph = document.createElement("div");
+            ph.className = "ln-ai-thumb ln-ai-thumb--broken";
+            ph.textContent = "can't load";
+            ph.title = url;
+            img.replaceWith(ph);
+        });
+        els.images.appendChild(img);
+    });
+
+    syncSendImagesUI();
+}
+
+function syncSendImagesUI() {
+    els.sendImages.checked = !!settings.sendImages;
+    els.imagesSection.classList.toggle("ln-ai-images-section--off", !settings.sendImages);
+}
+
+els.sendImages.addEventListener("change", () => {
+    settings.sendImages = els.sendImages.checked;
+    saveSettings();
+    syncSendImagesUI();
+    renderPrompt();
+});
 
 // --- Post data intake ------------------------------------------------------
 
@@ -380,6 +449,7 @@ window.addEventListener("message", (event) => {
         // The draft is specific to the target, so reset it when a new one loads.
         els.take.value = "";
         updateModeUI();
+        renderImages();
         renderPrompt();
         setStatus("");
         els.results.innerHTML = "";
@@ -601,10 +671,6 @@ function geminiUrl(model, key) {
 // cross-origin. A content-script fetch uses the *page's* origin and would stay
 // subject to CORS.
 
-const MAX_IMAGES = 4;
-const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
-const OK_IMAGE_TYPES = /^image\/(png|jpeg|webp|heic|heif)$/;
-
 function blobToBase64(blob) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -722,7 +788,7 @@ async function fetchComments() {
 
     // Attach the post's images so image-led posts aren't judged on text alone.
     // Failure here is never fatal — we fall back to a text-only request.
-    const imageUrls = currentImageUrls();
+    const imageUrls = imageUrlsToSend();
     let imageParts = [];
     if (imageUrls.length) {
         setStatus(imageUrls.length === 1 ? "Reading post image…" : "Reading post images…");
@@ -880,6 +946,7 @@ function renderComments(comments) {
 
 loadSettings().then(() => {
     hydrateSettingsForm();
+    syncSendImagesUI();
     applyTheme();
     renderPrompt();
 });

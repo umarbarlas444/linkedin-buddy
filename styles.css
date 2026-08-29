@@ -155,6 +155,69 @@ body.ln-ai-sidebar-body {
     margin-bottom: 6px;
 }
 
+/* ===== Post images ===== */
+
+.ln-ai-images-section {
+    margin-bottom: 14px;
+}
+
+.ln-ai-images {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* Thumbnails are loaded straight from LinkedIn's CDN; the sidebar is an
+   extension page, so no web_accessible_resources dance is needed. */
+.ln-ai-thumb {
+    display: block;
+    width: 72px;
+    height: 72px;
+    object-fit: cover;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--card-bg);
+}
+
+/* A thumbnail that failed to load — the URL is stale or the CDN refused it.
+   Shown rather than hidden so it's obvious why nothing was sent. */
+.ln-ai-thumb--broken {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 72px;
+    height: 72px;
+    box-sizing: border-box;
+    font-size: 11px;
+    text-align: center;
+    color: var(--muted);
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+}
+
+/* Dim the strip when the images won't be sent, so the checkbox state is
+   readable at a glance. */
+.ln-ai-images-section--off .ln-ai-images {
+    opacity: 0.4;
+}
+
+.ln-ai-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.ln-ai-checkbox input {
+    margin: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
 .ln-ai-section-label {
     font-size: 12px;
     text-transform: uppercase;

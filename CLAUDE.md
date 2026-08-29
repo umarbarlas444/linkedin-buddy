@@ -15,6 +15,16 @@ A Manifest V3 Chrome extension ("LinkedIn AI Comment Companion") that injects AI
 - After editing `sidebar.html`/`sidebar.js`/`styles.css`: the iframe reloads with the page, so a tab refresh is usually enough.
 - Debugging: content script logs to the LinkedIn page console with the `[LN-AI]` prefix (`DEBUG` flag at the top of [content.js](content.js)). Sidebar logs go to a *separate* console — inspect the iframe (right-click inside the panel → Inspect) or pick the `sidebar.html` context in DevTools.
 - Testing changes is manual: open the LinkedIn feed, confirm buttons appear on posts and next to comments, open the panel, generate. The one automated check is `node test.js` (asserts the `srcset` parser in `content.js`); there is no framework and no runner.
+- **The sidebar can be driven without LinkedIn or Chrome.** Copy `sidebar.html`/`sidebar.js`/`styles.css`/`icons/` to a temp dir, inject a stub for the two `chrome.*` APIs it touches before the `sidebar.js` tag, serve over `http://` (not `file://`), and drive it by posting `LN_AI_POST_DATA` messages with a fake post object:
+
+  ```js
+  window.chrome = {
+      storage: { sync: { get: (k, cb) => cb({}), set: () => {} } },
+      runtime: { getURL: (p) => p },
+  };
+  ```
+
+  This is how the image strip, the prompt preview, and both themes get checked; scraping changes in `content.js` still need a real logged-in feed.
 
 ## Architecture
 
@@ -49,6 +59,7 @@ Injection idempotency: posts are marked `data-ln-ai-injected="1"`, reply buttons
 
 - Settings (`chrome.storage.sync`, key `ln_ai_settings`): API key, model, theme, "about me" experience blurb, and the user-editable comment **styles** array. `defaultStyles()` seeds five built-ins **only on first run** — an empty `styles` array means the user deleted them all, so don't re-seed it.
 - `RETIRED_MODELS` silently upgrades stored ids Google has dropped. When the model dropdown in [sidebar.html](sidebar.html) changes, add the old ids there and keep `SETTINGS_DEFAULTS.model` in sync with the recommended option.
+- The panel shows the post's images as a thumbnail strip with a "Send to AI" checkbox (`settings.sendImages`, persisted, default on). Unticking it drops the images from the request *and* the image block from the prompt preview — `imageUrlsToSend()` is the single gate both read, so they can't drift apart.
 - Post images are sent to Gemini as extra `contents[].parts[]` entries (`{inline_data: {mime_type, data}}`) alongside the prompt text, capped at 4 images / 4MB each (the API's ceiling is 20MB for the whole request). Image failures are never fatal — `fetchImageParts()` swallows them and generation continues text-only with a status note. Reply mode inherits the parent post's images for free via `currentImageUrls()`.
 - A post with no body text yields `text: ""` on purpose (there used to be a `post.innerText` fallback; it scraped feed chrome and the model treated it as the post). `buildPrompt()` reads that empty string as "the attached image IS the post" and prompts accordingly.
 - `buildPrompt()` is the heart of the product: one function producing both comment and reply prompts (`currentMode`), assembling ABOUT ME / post context / comment being replied to / the user's own draft, then one numbered instruction per enabled style. It ends by demanding `"1. StyleName: ..."` lines — `parseStyledComments()` parses exactly that shape, so **changing the output format instruction means changing the parser**.
