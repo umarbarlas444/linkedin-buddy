@@ -98,8 +98,19 @@ body.ln-ai-sidebar-body {
 }
 
 .ln-ai-header h1 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-size: 16px;
     margin: 0;
+}
+
+/* The extension logo. Rendered at 20px from the 48px asset so it stays sharp
+   on hidpi displays; the icon already carries its own rounded-square shape. */
+.ln-ai-logo {
+    flex: none;
+    display: block;
+    border-radius: 4px;
 }
 
 .ln-ai-header-actions {

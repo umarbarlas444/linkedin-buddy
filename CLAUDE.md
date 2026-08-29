@@ -59,3 +59,21 @@ Injection idempotency: posts are marked `data-ln-ai-injected="1"`, reply buttons
 - Vanilla ES modules-free JS, 4-space indent, double quotes, no dependencies. Keep it that way — adding a build step means the "load unpacked" workflow above stops matching reality.
 - All extension-owned DOM uses the `ln-ai-` class/id prefix so it can't collide with LinkedIn's.
 - The scraping code is comment-heavy on purpose: each selector's comment records *why* that anchor survives LinkedIn's churn. Update the comment when you change the selector.
+
+## Assets
+
+`icons/` holds the extension logo: a white speech bubble with a sparkle on LinkedIn blue, generated
+with Higgsfield (`nano_banana_pro`). `icon512.png` is the master; the manifest sizes are derived from
+it, and the transparent rounded-square corners were masked in with ffmpeg (no ImageMagick or Pillow on
+this machine). To regenerate the sizes after replacing the master:
+
+```sh
+for s in 128 48 32 16; do
+  ffmpeg -v error -y -i icons/icon512.png -vf "scale=${s}:${s}:flags=lanczos" -frames:v 1 "icons/icon${s}.png"
+done
+```
+
+The sidebar header and favicon reference `icons/` with plain relative paths — `sidebar.html` is an
+extension-origin page, so it needs no `web_accessible_resources` entry. The in-page buttons injected by
+`content.js` still use the 🤖 emoji; switching those to the image *would* need a `web_accessible_resources`
+entry, since they render in the LinkedIn page's origin.

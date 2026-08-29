@@ -3,6 +3,12 @@
     "name": "LinkedIn AI Comment Companion",
     "version": "1.0",
     "description": "Generates tailored LinkedIn comments using AI via a floating sidebar.",
+    "icons": {
+        "16": "icons/icon16.png",
+        "32": "icons/icon32.png",
+        "48": "icons/icon48.png",
+        "128": "icons/icon128.png"
+    },
     "permissions": [
         "storage",
         "activeTab"
