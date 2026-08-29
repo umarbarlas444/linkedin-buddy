@@ -209,12 +209,46 @@ function getHeadline(post, textBox, authorLink) {
     return null;
 }
 
+// Below this width an <img> is an icon, logo, or tracking pixel, not post content.
+const MIN_CONTENT_IMAGE_PX = 200;
+
+function isContentImage(img) {
+    if (!img.src || img.src.startsWith("data:")) return false;
+    if (/feedshare|feedimage/i.test(img.src) || img.alt === "View image") return true;
+    // Avatars: inside a profile link, or labelled "View <name>'s profile".
+    if (img.closest('a[href*="/in/"]')) return false;
+    if (/^View\s/.test(img.alt || "") && PROFILE_ALT_RE.test(img.alt)) return false;
+    // naturalWidth is 0 until the image decodes; fall back to layout width so a
+    // still-loading content image isn't discarded.
+    const w = img.naturalWidth || img.width || 0;
+    return w >= MIN_CONTENT_IMAGE_PX;
+}
+
+// LinkedIn lazy-loads a low-res placeholder into `src` and lists the real
+// resolutions in `srcset`; a 100px thumbnail tells the model almost nothing, so
+// prefer the widest candidate available.
+function bestImageSrc(img) {
+    const set = img.getAttribute("srcset");
+    if (!set) return img.src;
+    let best = null;
+    for (const part of set.split(",")) {
+        const [url, size] = part.trim().split(/\s+/);
+        if (!url) continue;
+        const w = size && size.endsWith("w") ? parseInt(size, 10) : 0;
+        if (!best || w > best.w) best = { url, w };
+    }
+    return best && best.w ? new URL(best.url, location.href).href : img.src;
+}
+
 // Pull as much structured data as the DOM reliably exposes for one post.
 function extractPostData(post) {
     const textBox = post.querySelector('[data-testid="expandable-text-box"]');
     let text = textBox ? textBox.innerText.trim() : "";
     text = text.replace(/\s*…\s*more\s*$/i, "").trim();
-    if (!text) text = (post.innerText || "").trim().slice(0, 3000);
+    // No deliberate body text. The old fallback scraped `post.innerText`, which
+    // sweeps in the author block, CTAs, and reaction counts — noise the model then
+    // treats as the post. Leave it empty; the sidebar reads that as "the attached
+    // image(s) are the post" and prompts accordingly.
 
     const name = getAuthorName(post);
 
@@ -288,11 +322,16 @@ function extractPostData(post) {
           )]
         : [];
 
-    // Content images only — skip avatars and logos.
+    // Content images only — skip avatars and logos. The `feedshare|feedimage`
+    // URL slugs and the English "View image" alt are the fast path; when neither
+    // matches (localized UI, or a slug LinkedIn has since renamed) we fall back to
+    // rejecting what an image *isn't* — avatars live inside profile links or carry
+    // a "View <name>'s profile" label, and icons/logos/tracking pixels are small.
     const images = [...new Set(
         [...post.querySelectorAll("img")]
-            .filter((img) => /feedshare|feedimage/i.test(img.src) || img.alt === "View image")
-            .map((img) => img.src)
+            .filter(isContentImage)
+            .map(bestImageSrc)
+            .filter(Boolean)
     )];
 
     const hasVideo = !!post.querySelector("video");

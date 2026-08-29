@@ -9,6 +9,7 @@
     ],
     "host_permissions": [
         "https://*.linkedin.com/*",
+        "https://*.licdn.com/*",
         "https://generativelanguage.googleapis.com/*"
     ],
     "content_scripts": [
