@@ -236,27 +236,6 @@ function buildPrompt(post, experience, take, imageCount = 0) {
         if (post.isRepost) L.push("This is a repost/reshare.");
         if (post.socialContext) L.push(`Social context: ${post.socialContext}`);
         if (post.postedTime) L.push(`Posted: ${post.postedTime} ago`);
-        if (post.mediaType && post.mediaType !== "none") {
-            // This line is scraped metadata, independent of what we actually
-            // attach. Announcing "Media: image (1)" while sending no image tells
-            // the model something exists that it cannot see, and it will happily
-            // invent the contents — so spell out whatever is being withheld.
-            const total = (post.images || []).length;
-            let withheld = "";
-            if (post.mediaType === "video") {
-                withheld = " — the video is NOT attached; do not describe or guess at what it shows.";
-            } else if (total && imageCount === 0) {
-                withheld =
-                    total === 1
-                        ? " — NOT attached; do not describe or guess at what it shows."
-                        : " — NOT attached; do not describe or guess at what they show.";
-            } else if (total && imageCount < total) {
-                withheld = ` — only the first ${imageCount} of these are attached below.`;
-            }
-            L.push(
-                `Media: ${post.mediaType}${post.imageCount ? ` (${post.imageCount})` : ""}` + withheld
-            );
-        }
         const engagement = [
             c.reactions != null ? `${c.reactions} reactions` : null,
             c.comments != null ? `${c.comments} comments` : null,
@@ -278,6 +257,13 @@ function buildPrompt(post, experience, take, imageCount = 0) {
         // Tell the model the images are coming. When the post has no text of its
         // own the image IS the post, so say so explicitly — otherwise the model
         // pads out a generic comment from the author's headline alone.
+        //
+        // This is the ONLY place the prompt mentions media. There used to be a
+        // `Media: image (1)` line built from the scraped `mediaType` further up,
+        // emitted whether or not anything was actually attached — so a post whose
+        // images were held back still announced them, and the model invented the
+        // contents. Don't reintroduce it: media the model isn't given should not
+        // appear in the prompt at all, and when it IS given this block covers it.
         if (imageCount > 0) {
             const noun = imageCount === 1 ? "image" : `${imageCount} images`;
             L.push("");
