@@ -4,11 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" href="icons/icon32.png" />
     <title>AI Comment Companion</title>
 </head>
 <body class="ln-ai-sidebar-body">
     <header class="ln-ai-header">
-        <h1>🤖 AI Comment Companion</h1>
+        <h1><img class="ln-ai-logo" src="icons/icon48.png" alt="" width="20" height="20" />AI Comment Companion</h1>
         <div class="ln-ai-header-actions">
             <button id="ln-ai-settings-toggle" class="ln-ai-icon-btn" type="button" title="Settings">⚙️</button>
             <button id="ln-ai-close" class="ln-ai-close" type="button" title="Close">&times;</button>
@@ -83,6 +84,18 @@
                 </summary>
                 <pre id="ln-ai-json" class="ln-ai-json">Select a post to get started.</pre>
             </details>
+
+            <!-- Post images. Hidden entirely when the post has none. -->
+            <div id="ln-ai-images-section" class="ln-ai-images-section" hidden>
+                <div class="ln-ai-section-head">
+                    <div class="ln-ai-section-label" id="ln-ai-images-label">Post images</div>
+                    <label class="ln-ai-checkbox" for="ln-ai-send-images">
+                        <input type="checkbox" id="ln-ai-send-images" checked />
+                        <span>Send to AI</span>
+                    </label>
+                </div>
+                <div id="ln-ai-images" class="ln-ai-images"></div>
+            </div>
 
             <label class="ln-ai-section-label" for="ln-ai-take">Your take / draft comment (optional)</label>
             <textarea

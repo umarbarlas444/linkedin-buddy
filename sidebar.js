@@ -9,6 +9,7 @@ const SETTINGS_DEFAULTS = {
     model: "gemini-3.7-flash",
     theme: "system",
     experience: "",
+    sendImages: true, // attach the post's images to the request
     styles: [], // real defaults come from defaultStyles() on first run
 };
 
@@ -84,6 +85,13 @@ const RETIRED_MODELS = new Set([
     "gemini-1.5-pro",
 ]);
 
+// Image limits. Only the first MAX_IMAGES of a post are sent; the API's ceiling
+// is 20MB for the whole request, so these stay far under it. Declared up here
+// because the prompt preview and the thumbnail strip both read MAX_IMAGES.
+const MAX_IMAGES = 4;
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const OK_IMAGE_TYPES = /^image\/(png|jpeg|webp|heic|heif)$/;
+
 let settings = { ...SETTINGS_DEFAULTS };
 let currentMode = "comment"; // "comment" (on a post) | "reply" (to a comment)
 let currentPost = null; // the post, or the reply's parent post used as context
@@ -110,6 +118,10 @@ const els = {
     mode: document.getElementById("ln-ai-mode"),
     json: document.getElementById("ln-ai-json"),
     copyJson: document.getElementById("ln-ai-copy-json"),
+    imagesSection: document.getElementById("ln-ai-images-section"),
+    imagesLabel: document.getElementById("ln-ai-images-label"),
+    images: document.getElementById("ln-ai-images"),
+    sendImages: document.getElementById("ln-ai-send-images"),
     take: document.getElementById("ln-ai-take"),
     prompt: document.getElementById("ln-ai-prompt"),
     copyPrompt: document.getElementById("ln-ai-copy-prompt"),
@@ -180,7 +192,7 @@ function activeStyles() {
     return (settings.styles || []).filter((s) => s.enabled && (s.name || "").trim());
 }
 
-function buildPrompt(post, experience, take) {
+function buildPrompt(post, experience, take, imageCount = 0) {
     const isReply = currentMode === "reply" && !!currentComment;
     if (isReply ? !currentComment : !post) {
         return isReply
@@ -224,9 +236,6 @@ function buildPrompt(post, experience, take) {
         if (post.isRepost) L.push("This is a repost/reshare.");
         if (post.socialContext) L.push(`Social context: ${post.socialContext}`);
         if (post.postedTime) L.push(`Posted: ${post.postedTime} ago`);
-        if (post.mediaType && post.mediaType !== "none") {
-            L.push(`Media: ${post.mediaType}${post.imageCount ? ` (${post.imageCount})` : ""}`);
-        }
         const engagement = [
             c.reactions != null ? `${c.reactions} reactions` : null,
             c.comments != null ? `${c.comments} comments` : null,
@@ -244,6 +253,26 @@ function buildPrompt(post, experience, take) {
         L.push('"""');
         L.push(post.text || "(no text content)");
         L.push('"""');
+
+        // Tell the model the images are coming. When the post has no text of its
+        // own the image IS the post, so say so explicitly — otherwise the model
+        // pads out a generic comment from the author's headline alone.
+        //
+        // This is the ONLY place the prompt mentions media. There used to be a
+        // `Media: image (1)` line built from the scraped `mediaType` further up,
+        // emitted whether or not anything was actually attached — so a post whose
+        // images were held back still announced them, and the model invented the
+        // contents. Don't reintroduce it: media the model isn't given should not
+        // appear in the prompt at all, and when it IS given this block covers it.
+        if (imageCount > 0) {
+            const noun = imageCount === 1 ? "image" : `${imageCount} images`;
+            L.push("");
+            L.push(
+                (post.text || "").trim()
+                    ? `The ${noun} attached to this message ${imageCount === 1 ? "is" : "are"} from the post. Treat ${imageCount === 1 ? "it" : "them"} as part of the context.`
+                    : `This post has no meaningful text — the attached ${noun} ${imageCount === 1 ? "IS" : "ARE"} the post. Base the ${unit} on what ${imageCount === 1 ? "it shows" : "they show"}, and reference a specific detail you can actually see.`
+            );
+        }
     }
 
     // The comment we're replying to.
@@ -318,9 +347,77 @@ function buildPrompt(post, experience, take) {
     return L.join("\n");
 }
 
-function renderPrompt() {
-    els.prompt.textContent = buildPrompt(currentPost, settings.experience, els.take.value);
+// Every image on the current target. In reply mode `currentPost` is the parent
+// post, so replies inherit the post's images.
+function currentImageUrls() {
+    return (currentPost && currentPost.images) || [];
 }
+
+// The subset actually destined for the model — empty when the user has
+// unticked "Send to AI".
+function imageUrlsToSend() {
+    return settings.sendImages ? currentImageUrls() : [];
+}
+
+function renderPrompt() {
+    // Preview what will actually be sent: MAX_IMAGES is the ceiling per request,
+    // and unticking the checkbox drops the image block from the prompt entirely.
+    els.prompt.textContent = buildPrompt(
+        currentPost,
+        settings.experience,
+        els.take.value,
+        Math.min(imageUrlsToSend().length, MAX_IMAGES)
+    );
+}
+
+// --- Image strip -----------------------------------------------------------
+
+// Show the post's images in the panel so it's visible what the model is being
+// given, with a per-request opt-out. Thumbnails load straight from the CDN.
+function renderImages() {
+    const urls = currentImageUrls();
+    els.imagesSection.hidden = urls.length === 0;
+    els.images.innerHTML = "";
+    if (!urls.length) return;
+
+    const capped = urls.length > MAX_IMAGES;
+    els.imagesLabel.textContent =
+        urls.length === 1 ? "Post image" : `Post images (${urls.length})`;
+
+    urls.forEach((url, i) => {
+        const img = document.createElement("img");
+        img.className = "ln-ai-thumb";
+        img.src = url;
+        img.loading = "lazy";
+        img.alt = `Post image ${i + 1}`;
+        // Only the first MAX_IMAGES are sent; say so on the ones that aren't.
+        img.title = capped && i >= MAX_IMAGES ? `${url}\n(not sent — over the ${MAX_IMAGES}-image limit)` : url;
+        if (capped && i >= MAX_IMAGES) img.style.opacity = "0.35";
+        // A dead URL would otherwise show as a silent broken-image glyph.
+        img.addEventListener("error", () => {
+            const ph = document.createElement("div");
+            ph.className = "ln-ai-thumb ln-ai-thumb--broken";
+            ph.textContent = "can't load";
+            ph.title = url;
+            img.replaceWith(ph);
+        });
+        els.images.appendChild(img);
+    });
+
+    syncSendImagesUI();
+}
+
+function syncSendImagesUI() {
+    els.sendImages.checked = !!settings.sendImages;
+    els.imagesSection.classList.toggle("ln-ai-images-section--off", !settings.sendImages);
+}
+
+els.sendImages.addEventListener("change", () => {
+    settings.sendImages = els.sendImages.checked;
+    saveSettings();
+    syncSendImagesUI();
+    renderPrompt();
+});
 
 // --- Post data intake ------------------------------------------------------
 
@@ -356,6 +453,7 @@ window.addEventListener("message", (event) => {
         // The draft is specific to the target, so reset it when a new one loads.
         els.take.value = "";
         updateModeUI();
+        renderImages();
         renderPrompt();
         setStatus("");
         els.results.innerHTML = "";
@@ -566,6 +664,56 @@ function geminiUrl(model, key) {
     );
 }
 
+// --- Post images -----------------------------------------------------------
+//
+// Gemini takes images as extra parts on the same generateContent call. The bytes
+// have to be fetched and base64'd — the API's file_uri form only accepts Files
+// API URIs, not arbitrary CDN URLs.
+//
+// This runs here rather than in content.js on purpose: the sidebar is an
+// extension-origin document, so `host_permissions` for licdn.com lets it fetch
+// cross-origin. A content-script fetch uses the *page's* origin and would stay
+// subject to CORS.
+
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("read failed"));
+        reader.onload = () => {
+            // Strip the "data:<mime>;base64," prefix — the API wants raw base64.
+            const s = String(reader.result);
+            const comma = s.indexOf(",");
+            resolve(comma === -1 ? s : s.slice(comma + 1));
+        };
+        reader.readAsDataURL(blob);
+    });
+}
+
+// Fetch up to MAX_IMAGES urls into Gemini inline_data parts. Never throws: a
+// dead or oversized image is skipped, and total failure just yields [] so
+// generation continues text-only.
+async function fetchImageParts(urls) {
+    const results = await Promise.allSettled(
+        urls.slice(0, MAX_IMAGES).map(async (url) => {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const blob = await res.blob();
+            if (!OK_IMAGE_TYPES.test(blob.type)) throw new Error(`type ${blob.type}`);
+            if (blob.size > MAX_IMAGE_BYTES) throw new Error("too large");
+            return {
+                inline_data: { mime_type: blob.type, data: await blobToBase64(blob) },
+            };
+        })
+    );
+
+    return results
+        .filter((r) => {
+            if (r.status === "rejected") console.warn("[LN-AI] image skipped:", r.reason);
+            return r.status === "fulfilled";
+        })
+        .map((r) => r.value);
+}
+
 // HTTP statuses worth retrying: rate-limit and Google's transient overloads.
 const RETRYABLE_STATUS = new Set([429, 500, 503]);
 const MAX_ATTEMPTS = 3;
@@ -576,9 +724,9 @@ const backoffMs = (attempt) => 800 * 2 ** (attempt - 1) + Math.random() * 200;
 
 // Call Gemini, retrying transient failures (overload / rate-limit / network)
 // with backoff. Returns the parsed JSON body, or throws a friendly Error.
-async function callGemini(prompt) {
+async function callGemini(prompt, imageParts = []) {
     const body = JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        contents: [{ role: "user", parts: [{ text: prompt }, ...imageParts] }],
         // Roomy cap so every enabled style finishes even if the model does internal
         // reasoning first; the actual comments are short so this isn't wasteful.
         generationConfig: { temperature: 0.9, maxOutputTokens: 4096 },
@@ -639,14 +787,34 @@ async function fetchComments() {
         return;
     }
 
-    const prompt = buildPrompt(currentPost, settings.experience, els.take.value);
-
     els.generate.disabled = true;
-    setStatus("Generating suggestions…");
     els.results.innerHTML = "";
 
+    // Attach the post's images so image-led posts aren't judged on text alone.
+    // Failure here is never fatal — we fall back to a text-only request.
+    const imageUrls = imageUrlsToSend();
+    let imageParts = [];
+    if (imageUrls.length) {
+        setStatus(imageUrls.length === 1 ? "Reading post image…" : "Reading post images…");
+        try {
+            imageParts = await fetchImageParts(imageUrls);
+        } catch {
+            imageParts = [];
+        }
+    }
+    const imagesMissing = imageUrls.length > 0 && imageParts.length === 0;
+
+    const prompt = buildPrompt(
+        currentPost,
+        settings.experience,
+        els.take.value,
+        imageParts.length
+    );
+
+    setStatus("Generating suggestions…");
+
     try {
-        const data = await callGemini(prompt);
+        const data = await callGemini(prompt, imageParts);
 
         // Gemini can return a candidate with no content if the response was
         // blocked; surface that instead of failing silently.
@@ -678,6 +846,12 @@ async function fetchComments() {
                     "Generate again for the full set.",
                 true
             );
+        } else if (imagesMissing) {
+            setStatus("Couldn't load the post image; generated from text only.", true);
+        } else if (!imageParts.length && currentPost && currentPost.mediaType === "video") {
+            // No frames are extracted from video, so say so rather than quietly
+            // producing a comment that ignores the post's actual content.
+            setStatus("Video posts aren't read yet; generated from text only.", true);
         } else {
             setStatus("");
         }
@@ -776,6 +950,7 @@ function renderComments(comments) {
 
 loadSettings().then(() => {
     hydrateSettingsForm();
+    syncSendImagesUI();
     applyTheme();
     renderPrompt();
 });
